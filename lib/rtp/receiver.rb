@@ -7,9 +7,7 @@ require_relative 'logger'
 require_relative 'error'
 require_relative 'packet'
 
-
 module RTP
-
   # Objects of this type receive RTP data over a socket and either save them to
   # a file, or yield the packets to a given block.  This is useful with other
   # protocols, like RTSP.
@@ -17,7 +15,7 @@ module RTP
     include LogSwitch::Mixin
 
     # Name of the file the data will be captured to unless #rtp_file is set.
-    DEFAULT_CAPFILE_NAME = "rtp_capture.raw"
+    DEFAULT_CAPFILE_NAME = 'rtp_capture.raw'
 
     # Maximum number of bytes to receive on the socket.
     MAX_BYTES_TO_RECEIVE = 1500
@@ -56,18 +54,18 @@ module RTP
     #   be stripped from packets before they're written to the capture file.
     # @option options [File] :capture_file The file object to capture the RTP
     #   data to.
-    def initialize(options={})
-      @rtp_port           = options[:rtp_port]           || 6970
+    def initialize(options = {})
+      @rtp_port           = options[:rtp_port] || 6970
       @rtcp_port          = @rtp_port + 1
       @transport_protocol = options[:transport_protocol] || :UDP
       @ip_address         = options[:ip_address]         || '0.0.0.0'
       @strip_headers      = options[:strip_headers]      || false
       @capture_file       = options[:capture_file]       ||
-        Tempfile.new(DEFAULT_CAPFILE_NAME)
+                            Tempfile.new(DEFAULT_CAPFILE_NAME)
 
       at_exit do
         unless @capture_file.closed?
-          log "Closing and deleting capture capture file..."
+          log 'Closing and deleting capture capture file...'
           @capture_file.close
           @capture_file.unlink
         end
@@ -104,6 +102,7 @@ module RTP
     # @return [Boolean] true if started successfully.
     def start(&block)
       return false if running?
+
       log "Starting receiving on port #{@rtp_port}..."
 
       @packet_writer = start_packet_writer(&block)
@@ -121,7 +120,7 @@ module RTP
     #
     # @return [Boolean] true if stopped successfully.
     def stop
-      return false if !running?
+      return false unless running?
 
       log "Stopping #{self.class} on port #{@rtp_port}..."
       stop_listener
@@ -224,7 +223,7 @@ module RTP
         socket = TCPServer.new(ip_address, port)
       else
         raise RTP::Error,
-          "Unknown protocol requested: #{protocol}.  Options are :TCP or :UDP"
+              "Unknown protocol requested: #{protocol}.  Options are :TCP or :UDP"
       end
 
       set_socket_time_options(socket)
@@ -246,16 +245,14 @@ module RTP
 
       Thread.start(socket) do
         loop do
-          begin
-            msg = socket.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
-            data = msg.first
-            log "Received data at size: #{data.size}"
+          msg = socket.recvmsg_nonblock(MAX_BYTES_TO_RECEIVE)
+          data = msg.first
+          log "Received data at size: #{data.size}"
 
-            log "RTP timestamp from socket info: #{msg.last.timestamp}"
-            @packets << [data, msg.last.timestamp]
-          rescue Errno::EAGAIN
-            # Waiting for data on the socket...
-          end
+          log "RTP timestamp from socket info: #{msg.last.timestamp}"
+          @packets << [data, msg.last.timestamp]
+        rescue Errno::EAGAIN
+          # Waiting for data on the socket...
         end
       end
     end
@@ -264,11 +261,11 @@ module RTP
     #
     # @return [Boolean] true if it stopped listening.
     def stop_listener
-      log "Stopping listener..."
-      @socket.close if @socket
+      log 'Stopping listener...'
       @listener.kill if listening?
       @listener = nil
-      log "Listener stopped."
+      @socket.close if @socket
+      log 'Listener stopped.'
 
       !listening?
     end
@@ -278,11 +275,11 @@ module RTP
     #
     # @return [Boolean] true if it stopped the packet writer.
     def stop_packet_writer
-      log "Stopping packet writer..."
+      log 'Stopping packet writer...'
       wait_for = 10
 
       begin
-        timeout(wait_for) do
+        Timeout.timeout(wait_for) do
           sleep 0.2 until @packets.empty?
         end
       rescue Timeout::Error
@@ -292,7 +289,7 @@ module RTP
 
       @packet_writer.kill if writing_packets?
       @packet_writer = nil
-      log "Packet writer stopped."
+      log 'Packet writer stopped.'
 
       @capture_file.close
 
@@ -304,7 +301,7 @@ module RTP
     # @param [Socket] socket The Socket to set options on.
     def set_socket_time_options(socket)
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_TIMESTAMP, true)
-      optval = [0, 1].pack("l_2")
+      optval = [0, 1].pack('l_2')
       socket.setsockopt(Socket::SOL_SOCKET, Socket::SO_RCVTIMEO, optval)
     end
 
@@ -315,7 +312,7 @@ module RTP
     # @param [String] multicast_address The IP address to set the options on.
     def setup_multicast_socket(socket, multicast_address)
       set_membership(socket,
-        IPAddr.new(multicast_address).hton + IPAddr.new('0.0.0.0').hton)
+                     IPAddr.new(multicast_address).hton + IPAddr.new('0.0.0.0').hton)
       set_multicast_ttl(socket, MULTICAST_TTL)
       set_ttl(socket, MULTICAST_TTL)
     end
